@@ -2660,6 +2660,22 @@ class GatewayRunner:
         if platform_allow_all_var and os.getenv(platform_allow_all_var, "").lower() in ("true", "1", "yes"):
             return True
 
+        # Per-platform group allowlist: any user who speaks in a whitelisted
+        # group chat is implicitly authorized.  This lets a whole QQ group chat
+        # with the bot without enumerating every member under
+        # NAPCAT_ALLOWED_USERS.  DMs are unaffected and still require an
+        # explicit allowlist / pairing.
+        platform_group_allow_map = {
+            Platform.NAPCAT: "NAPCAT_ALLOWED_GROUPS",
+        }
+        platform_group_allow_var = platform_group_allow_map.get(source.platform, "")
+        if platform_group_allow_var and source.chat_type == "group" and source.chat_id:
+            raw = os.getenv(platform_group_allow_var, "").strip()
+            if raw:
+                allowed_groups = {g.strip() for g in raw.split(",") if g.strip()}
+                if "*" in allowed_groups or source.chat_id in allowed_groups:
+                    return True
+
         # Check pairing store (always checked, regardless of allowlists)
         platform_name = source.platform.value if source.platform else ""
         if self.pairing_store.is_approved(platform_name, user_id):

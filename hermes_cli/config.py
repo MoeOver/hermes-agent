@@ -48,7 +48,8 @@ _EXTRA_ENV_KEYS = frozenset({
     "QQ_ALLOWED_USERS", "QQ_GROUP_ALLOWED_USERS", "QQ_ALLOW_ALL_USERS", "QQ_MARKDOWN_SUPPORT",
     "QQ_STT_API_KEY", "QQ_STT_BASE_URL", "QQ_STT_MODEL",
     "NAPCAT_ENABLED", "NAPCAT_TOKEN", "NAPCAT_HOST", "NAPCAT_PORT", "NAPCAT_PATH",
-    "NAPCAT_ALLOWED_USERS", "NAPCAT_GROUP_ALLOWED_USERS", "NAPCAT_ALLOW_ALL_USERS",
+    "NAPCAT_ALLOWED_USERS", "NAPCAT_GROUP_ALLOWED_USERS", "NAPCAT_ALLOWED_GROUPS",
+    "NAPCAT_ALLOW_ALL_USERS",
     "NAPCAT_HOME_CHANNEL", "NAPCAT_HOME_CHANNEL_NAME",
     "TERMINAL_ENV", "TERMINAL_SSH_KEY", "TERMINAL_SSH_PORT",
     "WHATSAPP_MODE", "WHATSAPP_ENABLED",
@@ -1570,6 +1571,11 @@ OPTIONAL_ENV_VARS = {
     "NAPCAT_GROUP_ALLOWED_USERS": {
         "description": "Comma-separated QQ user numbers allowed to talk to the bot in group chats via NapCat",
         "prompt": "NapCat Group Allowed Users",
+        "category": "messaging",
+    },
+    "NAPCAT_ALLOWED_GROUPS": {
+        "description": "Comma-separated QQ group numbers where every member is allowed to chat with the bot (use * to allow every group)",
+        "prompt": "NapCat Allowed Groups",
         "category": "messaging",
     },
     "NAPCAT_ALLOW_ALL_USERS": {

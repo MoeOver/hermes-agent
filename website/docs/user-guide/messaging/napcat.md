@@ -28,7 +28,7 @@
 | 能力                       | 状态 |
 |----------------------------|------|
 | 好友私聊                   | ✅ 文字进、文字出 |
-| 群聊                       | ✅ 需要 `@机器人`，分发前会剥掉 `@` 段 |
+| 群聊                       | ✅ 必须显式 `@机器人`（QQ 回复机器人消息时客户端会自动带上 `@`，所以回复机器人也能触发；回复别人不会触发） |
 | 回复串联                   | ✅ `reply_to` 会映射为 OneBot 的 `reply` 段 |
 | 引用即 @                    | ✅ 回复机器人之前发的消息也算被 @ |
 | 多段长消息                 | ✅ 超长回复会被切片发送 |
@@ -67,6 +67,7 @@ NAPCAT_HOST=0.0.0.0            # 同机就用 127.0.0.1
 NAPCAT_PORT=8646
 NAPCAT_PATH=/napcat/ws
 NAPCAT_ALLOWED_USERS=10001,10002   # 允许私聊的 QQ 号
+NAPCAT_ALLOWED_GROUPS=987654       # 可选：这些群里任何成员都能聊（* 代表任意群）
 NAPCAT_HOME_CHANNEL=10001          # 或 group:987654 代表群聊
 ```
 
@@ -97,7 +98,8 @@ platforms:
 | `NAPCAT_PORT`                | 反向 WS 服务监听端口                                                | `8646`        |
 | `NAPCAT_PATH`                | NapCat 连接的 WebSocket 路径                                        | `/napcat/ws`  |
 | `NAPCAT_ALLOWED_USERS`       | 允许私聊机器人的 QQ 号，逗号分隔                                    | 全部放行      |
-| `NAPCAT_GROUP_ALLOWED_USERS` | 允许在群里对话的 QQ 号，逗号分隔                                    | 全部放行      |
+| `NAPCAT_GROUP_ALLOWED_USERS` | 允许在群里对话的 QQ 号，逗号分隔（按成员 QQ 号粒度白名单）          | 全部放行      |
+| `NAPCAT_ALLOWED_GROUPS`      | 列出的群号里**所有成员**都能和机器人互动，逗号分隔，`*` 表示任意群  | 关闭          |
 | `NAPCAT_ALLOW_ALL_USERS`     | `true` 表示完全跳过白名单                                           | `false`       |
 | `NAPCAT_HOME_CHANNEL`        | cron 任务默认投递的目标：`10001` 或 `group:987654`                  | —             |
 | `NAPCAT_HOME_CHANNEL_NAME`   | home channel 的展示名                                               | `Home`        |
@@ -210,7 +212,8 @@ websocketClients: [
 
 ## 使用小贴士
 
-- **群里必须 @ 机器人。** 只有被显式 `@` 的群消息才会触发回路；回复机器人之前的消息也算被 @，所以跟帖追问不用每次都 @。
+- **群里必须 @ 机器人。** 只有被显式 `@` 的群消息才会触发回路。QQ 客户端在你「回复」机器人消息时会自动带上 `@机器人`，所以跟帖追问照样触发；但回复别人的消息不会被误判。
+- **要让整个群无差别互动？** 配 `NAPCAT_ALLOWED_GROUPS=<群号>` 即可，列出的群里每个成员都不再需要被加到 `NAPCAT_ALLOWED_USERS`；多个群号用逗号分隔，`*` 代表任意群。（仍然需要在群里 `@机器人` 才会触发，这一步是防刷屏。）
 - **私聊永远触发。** 任何发给机器人 QQ 的 1:1 文字都会转进去，不想被任意人打扰就配 `NAPCAT_ALLOWED_USERS`。
 - **定时任务发群消息。** 在 `NAPCAT_HOME_CHANNEL` 或 `send_message(deliver="napcat", chat_id="group:987654")` 里用 `group:<群号>`；私聊直接写 QQ 号。
 - **同一时刻只保留一条 NapCat 连接。** 新的反向 WS 会顶掉旧的 —— NapCat 本身就是一号对一端。要跑多账号就起多个 Hermes 实例，换不同端口和 token。

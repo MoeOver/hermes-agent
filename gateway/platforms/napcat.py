@@ -430,12 +430,17 @@ class NapCatAdapter(BasePlatformAdapter):
         return reply_to, " ".join(part.strip() for part in text_parts if part.strip()).strip()
 
     def _strip_self_mention(self, segments: List[Dict[str, Any]]):
-        """Return (mentioned, cleaned_text) with the @self_id segment removed."""
+        """Return (mentioned, cleaned_text) with the @self_id segment removed.
+
+        Only an explicit ``@bot`` counts as a mention. QQ automatically inserts
+        an ``at`` segment for the replied author when the client uses the
+        native "reply" feature, so replying to a bot message still triggers
+        the bot while replying to someone else's message does not.
+        """
         if not self._self_id:
             return False, ""
         mentioned = False
         text_parts: List[str] = []
-        reply_seen = False
         for seg in segments:
             seg_type = seg.get("type")
             data = seg.get("data") if isinstance(seg.get("data"), dict) else {}
@@ -445,18 +450,13 @@ class NapCatAdapter(BasePlatformAdapter):
                     mentioned = True
                 continue
             if seg_type == "reply":
-                # Reply to a message authored by the bot counts as a mention —
-                # this lets users keep a thread going without re-@'ing the bot.
-                target = str(data.get("id") or "")
-                if target:
-                    reply_seen = True
                 continue
             if seg_type == "text":
                 value = data.get("text")
                 if isinstance(value, str):
                     text_parts.append(value)
         cleaned = " ".join(part.strip() for part in text_parts if part.strip()).strip()
-        return mentioned or reply_seen, cleaned
+        return mentioned, cleaned
 
     def _is_duplicate(self, msg_id: str) -> bool:
         now = time.time()

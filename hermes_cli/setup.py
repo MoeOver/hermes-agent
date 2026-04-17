@@ -2183,6 +2183,14 @@ def _setup_napcat():
         print_info("⚠️  No allowlist set — anyone who DMs the QQ account can use the bot!")
 
     print()
+    print_info("👥 Group-wide access: list QQ group numbers where EVERY member may chat with the bot.")
+    print_info("   Leave empty to require per-user allowlisting.  Use '*' to allow every group.")
+    allowed_groups = prompt("Allowed QQ group numbers (comma-separated)")
+    if allowed_groups:
+        save_env_value("NAPCAT_ALLOWED_GROUPS", allowed_groups.replace(" ", ""))
+        print_success("NapCat group allowlist configured")
+
+    print()
     print_info("📬 Home Channel: QQ chat ID for cron delivery and notifications.")
     print_info("   For private chats use the QQ number.  For groups prefix with 'group:' (e.g. group:123456).")
     home_channel = prompt("Home channel ID (leave empty to set later)")

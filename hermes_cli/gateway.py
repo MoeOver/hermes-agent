@@ -2028,6 +2028,8 @@ _PLATFORMS = [
             {"name": "NAPCAT_ALLOWED_USERS", "prompt": "Allowed user QQ numbers (comma-separated, leave empty for open access)", "password": False,
              "is_allowlist": True,
              "help": "Optional — restrict DM access to specific QQ numbers (user_id in OneBot events)."},
+            {"name": "NAPCAT_ALLOWED_GROUPS", "prompt": "Allowed QQ group numbers (comma-separated, * = any group)", "password": False, "optional": True,
+             "help": "Any member of a listed group can chat with the bot without per-user allowlisting."},
             {"name": "NAPCAT_HOME_CHANNEL", "prompt": "Home channel (QQ number for private, 'group:<id>' for group — or empty)", "password": False,
              "help": "Chat to deliver cron results and notifications to."},
         ],

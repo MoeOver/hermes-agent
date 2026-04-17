@@ -294,6 +294,7 @@ For cloud sandbox backends, persistence is filesystem-oriented. `TERMINAL_LIFETI
 | `NAPCAT_PATH` | WebSocket path NapCat connects to (default: `/napcat/ws`) |
 | `NAPCAT_ALLOWED_USERS` | Comma-separated QQ user numbers allowed to DM the bot |
 | `NAPCAT_GROUP_ALLOWED_USERS` | Comma-separated QQ user numbers allowed to talk in group chats |
+| `NAPCAT_ALLOWED_GROUPS` | Comma-separated QQ group numbers whose members are all authorized (use `*` for any group) |
 | `NAPCAT_ALLOW_ALL_USERS` | Allow all NapCat users without an allowlist (`true`/`false`) |
 | `NAPCAT_HOME_CHANNEL` | Default NapCat chat for cron delivery (`10001` for private, `group:987654` for group) |
 | `NAPCAT_HOME_CHANNEL_NAME` | Display name for the NapCat home channel |
