@@ -36,6 +36,7 @@ const sidebars: SidebarsConfig = {
       collapsed: true,
       items: [
         'user-guide/features/overview',
+        'user-guide/features/tool-gateway',
         {
           type: 'category',
           label: 'Core',
@@ -78,6 +79,7 @@ const sidebars: SidebarsConfig = {
           label: 'Management',
           items: [
             'user-guide/features/web-dashboard',
+            'user-guide/features/dashboard-plugins',
           ],
         },
         {

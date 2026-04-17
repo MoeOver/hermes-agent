@@ -11,6 +11,7 @@ import asyncio
 import json
 import logging
 import os
+import html as _html
 import re
 from typing import Dict, List, Optional, Any
 
@@ -665,14 +666,14 @@ class TelegramAdapter(BasePlatformAdapter):
                 from telegram.error import NetworkError, TimedOut
             except ImportError:
                 NetworkError = TimedOut = OSError  # type: ignore[misc,assignment]
-            _max_connect = 3
+            _max_connect = 8
             for _attempt in range(_max_connect):
                 try:
                     await self._app.initialize()
                     break
                 except (NetworkError, TimedOut, OSError) as init_err:
                     if _attempt < _max_connect - 1:
-                        wait = 2 ** _attempt
+                        wait = min(2 ** _attempt, 15)
                         logger.warning(
                             "[%s] Connect attempt %d/%d failed: %s — retrying in %ds",
                             self.name, _attempt + 1, _max_connect, init_err, wait,
@@ -1129,13 +1130,10 @@ class TelegramAdapter(BasePlatformAdapter):
 
         try:
             cmd_preview = command[:3800] + "..." if len(command) > 3800 else command
-            # Escape backticks that would break Markdown v1 inline code parsing
-            safe_cmd = cmd_preview.replace("`", "'")
-            safe_desc = description.replace("`", "'").replace("*", "∗")
             text = (
-                f"⚠️ *Command Approval Required*\n\n"
-                f"`{safe_cmd}`\n\n"
-                f"Reason: {safe_desc}"
+                f"⚠️ <b>Command Approval Required</b>\n\n"
+                f"<pre>{_html.escape(cmd_preview)}</pre>\n\n"
+                f"Reason: {_html.escape(description)}"
             )
 
             # Resolve thread context for thread replies
@@ -1163,7 +1161,7 @@ class TelegramAdapter(BasePlatformAdapter):
             kwargs: Dict[str, Any] = {
                 "chat_id": int(chat_id),
                 "text": text,
-                "parse_mode": ParseMode.MARKDOWN,
+                "parse_mode": ParseMode.HTML,
                 "reply_markup": keyboard,
                 **self._link_preview_kwargs(),
             }
