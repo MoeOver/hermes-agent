@@ -297,10 +297,21 @@ class NapCatAdapter(BasePlatformAdapter):
         if post_type == "message":
             event = self._build_message_event(payload)
             if event is not None:
-                await self.handle_message(event)
+                self._dispatch_message_event(event)
             return
         # notice / request events are not surfaced to the agent yet.
         logger.debug("[%s] unhandled post_type=%s", self.name, post_type)
+
+    def _dispatch_message_event(self, event: MessageEvent) -> None:
+        """Process inbound messages without blocking the websocket read loop."""
+        task = asyncio.create_task(self.handle_message(event))
+        try:
+            self._background_tasks.add(task)
+        except TypeError:
+            return
+        if hasattr(task, "add_done_callback"):
+            task.add_done_callback(self._background_tasks.discard)
+            task.add_done_callback(self._expected_cancelled_tasks.discard)
 
     def _handle_meta_event(self, payload: Dict[str, Any]) -> None:
         self_id = payload.get("self_id")
@@ -530,9 +541,17 @@ class NapCatAdapter(BasePlatformAdapter):
         try:
             response = await self._call_action(action, params)
         except asyncio.TimeoutError:
-            return SendResult(success=False, error="NapCat send timed out", retryable=True)
+            # Waiting for the OneBot echo timed out after we already wrote the
+            # request to the socket. The message may have been delivered, so do
+            # not auto-retry and risk duplicate sends.
+            return SendResult(success=False, error="NapCat send timed out")
         except RuntimeError as exc:
-            return SendResult(success=False, error=str(exc), retryable=True)
+            error = str(exc)
+            return SendResult(
+                success=False,
+                error=error,
+                retryable=self._is_retryable_runtime_send_error(error),
+            )
 
         if response.get("status") != "ok" or response.get("retcode", 0) != 0:
             return SendResult(
@@ -586,6 +605,12 @@ class NapCatAdapter(BasePlatformAdapter):
             return int(str(value).strip())
         except (TypeError, ValueError):
             return value
+
+    @staticmethod
+    def _is_retryable_runtime_send_error(error: str) -> bool:
+        """Return True only for failures that happen before sending anything."""
+        lowered = error.lower()
+        return "websocket not connected" in lowered
 
     # ------------------------------------------------------------------
     # BasePlatformAdapter hooks
