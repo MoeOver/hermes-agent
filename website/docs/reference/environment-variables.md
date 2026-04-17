@@ -273,6 +273,16 @@ For cloud sandbox backends, persistence is filesystem-oriented. `TERMINAL_LIFETI
 | `QQ_GROUP_ALLOWED_USERS` | Comma-separated QQ group IDs for group @-message access |
 | `QQ_ALLOW_ALL_USERS` | Allow all users (`true`/`false`, overrides `QQ_ALLOWED_USERS`) |
 | `QQ_HOME_CHANNEL` | QQ user/group openID for cron delivery and notifications |
+| `NAPCAT_TOKEN` | Shared access token used to authenticate NapCat's reverse-WebSocket upgrade |
+| `NAPCAT_ENABLED` | Enable the NapCat adapter even without a token in `.env` (`true`/`false`) |
+| `NAPCAT_HOST` | Bind host for the NapCat reverse-WS server (default: `0.0.0.0`) |
+| `NAPCAT_PORT` | Bind port for the NapCat reverse-WS server (default: `8646`) |
+| `NAPCAT_PATH` | WebSocket path NapCat connects to (default: `/napcat/ws`) |
+| `NAPCAT_ALLOWED_USERS` | Comma-separated QQ user numbers allowed to DM the bot |
+| `NAPCAT_GROUP_ALLOWED_USERS` | Comma-separated QQ user numbers allowed to talk in group chats |
+| `NAPCAT_ALLOW_ALL_USERS` | Allow all NapCat users without an allowlist (`true`/`false`) |
+| `NAPCAT_HOME_CHANNEL` | Default NapCat chat for cron delivery (`10001` for private, `group:987654` for group) |
+| `NAPCAT_HOME_CHANNEL_NAME` | Display name for the NapCat home channel |
 | `MATTERMOST_URL` | Mattermost server URL (e.g. `https://mm.example.com`) |
 | `MATTERMOST_TOKEN` | Bot token or personal access token for Mattermost |
 | `MATTERMOST_ALLOWED_USERS` | Comma-separated Mattermost user IDs allowed to message the bot |

@@ -373,6 +373,7 @@ Each platform has its own toolset:
 | Weixin | `hermes-weixin` | Full tools including terminal |
 | BlueBubbles | `hermes-bluebubbles` | Full tools including terminal |
 | QQBot | `hermes-qqbot` | Full tools including terminal |
+| NapCat (QQ) | `hermes-napcat` | Full tools including terminal |
 | API Server | `hermes` (default) | Full tools including terminal |
 | Webhooks | `hermes-webhook` | Full tools including terminal |
 
@@ -395,5 +396,6 @@ Each platform has its own toolset:
 - [Weixin Setup (WeChat)](weixin.md)
 - [BlueBubbles Setup (iMessage)](bluebubbles.md)
 - [QQBot Setup](qqbot.md)
+- [NapCat Setup (QQ / OneBot 11)](napcat.md)
 - [Open WebUI + API Server](open-webui.md)
 - [Webhooks](webhooks.md)

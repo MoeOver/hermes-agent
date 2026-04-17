@@ -153,6 +153,7 @@ def _handle_send(args):
         "signal": Platform.SIGNAL,
         "bluebubbles": Platform.BLUEBUBBLES,
         "qqbot": Platform.QQBOT,
+        "napcat": Platform.NAPCAT,
         "matrix": Platform.MATRIX,
         "mattermost": Platform.MATTERMOST,
         "homeassistant": Platform.HOMEASSISTANT,
@@ -472,6 +473,8 @@ async def _send_to_platform(platform, pconfig, chat_id, message, thread_id=None,
             result = await _send_bluebubbles(pconfig.extra, chat_id, chunk)
         elif platform == Platform.QQBOT:
             result = await _send_qqbot(pconfig, chat_id, chunk)
+        elif platform == Platform.NAPCAT:
+            result = await _send_napcat(chat_id, chunk)
         else:
             result = {"error": f"Direct sending not yet implemented for {platform.value}"}
 
@@ -1191,6 +1194,54 @@ def _check_send_message():
         return is_gateway_running()
     except Exception:
         return False
+
+
+async def _send_napcat(chat_id, message):
+    """Send via the running NapCat gateway adapter.
+
+    NapCat uses a reverse WebSocket — only the gateway process holds the live
+    connection, so cross-platform delivery (cron jobs, send_message tool) must
+    route through the in-process adapter instance registered by GatewayRunner.
+    If no running adapter is found, return a clear error explaining the
+    requirement.
+    """
+    adapter = None
+    try:
+        from gateway.run import GatewayRunner  # noqa: F401 — imported for type check
+    except Exception:
+        GatewayRunner = None  # type: ignore
+
+    try:
+        from gateway.config import Platform as _Platform
+        # Adapters register themselves on the GatewayRunner; use the
+        # module-level weak registry if available, otherwise look for an
+        # active adapter via process-local status.
+        import gateway.run as _run
+        runner = getattr(_run, "_active_runner", None)
+        if runner is not None:
+            adapter = runner.adapters.get(_Platform.NAPCAT)
+    except Exception:
+        adapter = None
+
+    if adapter is None or not getattr(adapter, "is_connected", False):
+        return _error(
+            "NapCat send requires the gateway to be running with an active NapCat "
+            "connection. Start it via `hermes gateway run`, connect NapCat, then retry."
+        )
+
+    try:
+        result = await adapter.send(chat_id=chat_id, content=message)
+    except Exception as exc:
+        return _error(f"NapCat send failed: {exc}")
+
+    if not result.success:
+        return _error(f"NapCat send failed: {result.error or 'unknown error'}")
+    return {
+        "success": True,
+        "platform": "napcat",
+        "chat_id": chat_id,
+        "message_id": result.message_id,
+    }
 
 
 async def _send_qqbot(pconfig, chat_id, message):

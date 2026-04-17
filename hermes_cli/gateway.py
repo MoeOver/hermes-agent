@@ -2002,6 +2002,36 @@ _PLATFORMS = [
              "help": "OpenID to deliver cron results and notifications to."},
         ],
     },
+    {
+        "key": "napcat",
+        "label": "NapCat (QQ / OneBot 11)",
+        "emoji": "🐱",
+        "token_var": "NAPCAT_TOKEN",
+        "setup_instructions": [
+            "1. Install NapCatQQ on the machine running QQ (https://github.com/NapNeko/NapCatQQ)",
+            "2. Pick a shared access token and bind address/port for Hermes",
+            "3. In NapCat Web UI → Network → Add → WebSocket Client:",
+            "     URL:  ws://<hermes-host>:<NAPCAT_PORT><NAPCAT_PATH>",
+            "     access_token: <NAPCAT_TOKEN>",
+            "     messagePostFormat: array",
+            "4. Start the gateway with `hermes gateway run`",
+        ],
+        "vars": [
+            {"name": "NAPCAT_TOKEN", "prompt": "NapCat access token (shared secret)", "password": True,
+             "help": "Any strong random string — must match NapCat's websocketClients access_token."},
+            {"name": "NAPCAT_HOST", "prompt": "Bind host (default 0.0.0.0)", "password": False, "optional": True,
+             "help": "Host interface to bind. Use 0.0.0.0 to accept connections from any network interface."},
+            {"name": "NAPCAT_PORT", "prompt": "Bind port (default 8646)", "password": False, "optional": True,
+             "help": "TCP port Hermes listens on for NapCat reverse-WS upgrade."},
+            {"name": "NAPCAT_PATH", "prompt": "Endpoint path (default /napcat/ws)", "password": False, "optional": True,
+             "help": "WebSocket path — must match the URL configured in NapCat."},
+            {"name": "NAPCAT_ALLOWED_USERS", "prompt": "Allowed user QQ numbers (comma-separated, leave empty for open access)", "password": False,
+             "is_allowlist": True,
+             "help": "Optional — restrict DM access to specific QQ numbers (user_id in OneBot events)."},
+            {"name": "NAPCAT_HOME_CHANNEL", "prompt": "Home channel (QQ number for private, 'group:<id>' for group — or empty)", "password": False,
+             "help": "Chat to deliver cron results and notifications to."},
+        ],
+    },
 ]
 
 

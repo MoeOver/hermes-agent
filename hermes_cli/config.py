@@ -48,6 +48,9 @@ _EXTRA_ENV_KEYS = frozenset({
     "QQ_APP_ID", "QQ_CLIENT_SECRET", "QQ_HOME_CHANNEL", "QQ_HOME_CHANNEL_NAME",
     "QQ_ALLOWED_USERS", "QQ_GROUP_ALLOWED_USERS", "QQ_ALLOW_ALL_USERS", "QQ_MARKDOWN_SUPPORT",
     "QQ_STT_API_KEY", "QQ_STT_BASE_URL", "QQ_STT_MODEL",
+    "NAPCAT_ENABLED", "NAPCAT_TOKEN", "NAPCAT_HOST", "NAPCAT_PORT", "NAPCAT_PATH",
+    "NAPCAT_ALLOWED_USERS", "NAPCAT_GROUP_ALLOWED_USERS", "NAPCAT_ALLOW_ALL_USERS",
+    "NAPCAT_HOME_CHANNEL", "NAPCAT_HOME_CHANNEL_NAME",
     "TERMINAL_ENV", "TERMINAL_SSH_KEY", "TERMINAL_SSH_PORT",
     "WHATSAPP_MODE", "WHATSAPP_ENABLED",
     "MATTERMOST_HOME_CHANNEL", "MATTERMOST_REPLY_MODE",
@@ -1466,6 +1469,57 @@ OPTIONAL_ENV_VARS = {
     "QQ_SANDBOX": {
         "description": "Enable QQ sandbox mode for development testing (true/false)",
         "prompt": "QQ Sandbox Mode",
+        "category": "messaging",
+    },
+    "NAPCAT_ENABLED": {
+        "description": "Enable the NapCat (OneBot 11) reverse-WebSocket adapter",
+        "prompt": "Enable NapCat",
+        "category": "messaging",
+    },
+    "NAPCAT_TOKEN": {
+        "description": "Shared access token between Hermes and NapCat (used for Authorization: Bearer)",
+        "prompt": "NapCat Access Token",
+        "password": True,
+        "category": "messaging",
+    },
+    "NAPCAT_HOST": {
+        "description": "Hostname Hermes binds the NapCat WebSocket server to (default 0.0.0.0)",
+        "prompt": "NapCat Host",
+        "category": "messaging",
+    },
+    "NAPCAT_PORT": {
+        "description": "Port Hermes binds the NapCat WebSocket server to (default 8646)",
+        "prompt": "NapCat Port",
+        "category": "messaging",
+    },
+    "NAPCAT_PATH": {
+        "description": "WebSocket path NapCat should connect to (default /napcat/ws)",
+        "prompt": "NapCat Path",
+        "category": "messaging",
+    },
+    "NAPCAT_ALLOWED_USERS": {
+        "description": "Comma-separated QQ user numbers allowed to DM the bot via NapCat",
+        "prompt": "NapCat Allowed Users",
+        "category": "messaging",
+    },
+    "NAPCAT_GROUP_ALLOWED_USERS": {
+        "description": "Comma-separated QQ user numbers allowed to talk to the bot in group chats via NapCat",
+        "prompt": "NapCat Group Allowed Users",
+        "category": "messaging",
+    },
+    "NAPCAT_ALLOW_ALL_USERS": {
+        "description": "Allow all NapCat users without an allowlist (true/false)",
+        "prompt": "Allow All NapCat Users",
+        "category": "messaging",
+    },
+    "NAPCAT_HOME_CHANNEL": {
+        "description": "Default NapCat chat ID for cron delivery and notifications (group:<id> for groups)",
+        "prompt": "NapCat Home Channel",
+        "category": "messaging",
+    },
+    "NAPCAT_HOME_CHANNEL_NAME": {
+        "description": "Display name for the NapCat home channel",
+        "prompt": "NapCat Home Channel Name",
         "category": "messaging",
     },
     "GATEWAY_ALLOW_ALL_USERS": {

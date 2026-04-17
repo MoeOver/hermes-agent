@@ -2101,6 +2101,78 @@ def _setup_qqbot():
         _setup_standard_platform(qq_platform)
 
 
+def _setup_napcat():
+    """Configure NapCat (OneBot 11) reverse WebSocket gateway."""
+    import secrets
+
+    print_header("NapCat (QQ via OneBot 11)")
+    existing = get_env_value("NAPCAT_TOKEN")
+    if existing:
+        print_info("NapCat: already configured")
+        if not prompt_yes_no("Reconfigure NapCat?", False):
+            return
+
+    print_info("Connects Hermes to QQ via NapCat, a third-party OneBot 11 client.")
+    print_info("   NapCat runs on a Windows/desktop QQ machine and connects TO Hermes")
+    print_info("   over a reverse WebSocket. No public IP or inbound QQ API is required.")
+    print_info("   Project: https://github.com/NapNeko/NapCatQQ")
+    print()
+
+    token = prompt(
+        "NapCat access token (shared secret — leave empty to generate)",
+        password=True,
+    )
+    if not token:
+        token = secrets.token_urlsafe(24)
+        print_info(f"   Generated token: {token}")
+        print_info("   Copy this token into NapCat's websocketClients access_token.")
+    save_env_value("NAPCAT_TOKEN", token)
+    print_success("NapCat token saved")
+
+    print()
+    print_info("Bind address — the host/port Hermes listens on for NapCat.")
+    host = prompt("NAPCAT_HOST (default: 0.0.0.0 — all interfaces)")
+    if host:
+        save_env_value("NAPCAT_HOST", host.strip())
+    port = prompt("NAPCAT_PORT (default: 8646)")
+    if port:
+        try:
+            save_env_value("NAPCAT_PORT", str(int(port)))
+        except ValueError:
+            print_warning("Invalid port number, using default 8646")
+    path = prompt("NAPCAT_PATH (default: /napcat/ws)")
+    if path:
+        save_env_value("NAPCAT_PATH", path.strip() if path.strip().startswith("/") else "/" + path.strip())
+
+    save_env_value("NAPCAT_ENABLED", "true")
+
+    print()
+    print_info("🔒 Security: Restrict who can DM your bot.")
+    print_info("   Use QQ user numbers (found in NapCat message events as user_id).")
+    allowed_users = prompt("Allowed user QQ numbers (comma-separated, leave empty for open access)")
+    if allowed_users:
+        save_env_value("NAPCAT_ALLOWED_USERS", allowed_users.replace(" ", ""))
+        print_success("NapCat allowlist configured")
+    else:
+        print_info("⚠️  No allowlist set — anyone who DMs the QQ account can use the bot!")
+
+    print()
+    print_info("📬 Home Channel: QQ chat ID for cron delivery and notifications.")
+    print_info("   For private chats use the QQ number.  For groups prefix with 'group:' (e.g. group:123456).")
+    home_channel = prompt("Home channel ID (leave empty to set later)")
+    if home_channel:
+        save_env_value("NAPCAT_HOME_CHANNEL", home_channel.strip())
+
+    print()
+    print_success("NapCat configured! Next steps:")
+    print_info("   1. Install NapCatQQ on the machine running QQ.")
+    print_info("   2. In NapCat → Network → Add → WebSocket Client, set:")
+    print_info("      URL:            ws://<hermes-host>:8646/napcat/ws")
+    print_info("      access_token:   <NAPCAT_TOKEN>")
+    print_info("      messagePostFormat: array")
+    print_info("   3. Start the gateway: hermes gateway run")
+
+
 def _setup_webhooks():
     """Configure webhook integration."""
     print_header("Webhooks")
@@ -2165,6 +2237,7 @@ _GATEWAY_PLATFORMS = [
     ("Weixin (WeChat)", "WEIXIN_ACCOUNT_ID", _setup_weixin),
     ("BlueBubbles (iMessage)", "BLUEBUBBLES_SERVER_URL", _setup_bluebubbles),
     ("QQ Bot", "QQ_APP_ID", _setup_qqbot),
+    ("NapCat (QQ via OneBot 11)", "NAPCAT_TOKEN", _setup_napcat),
     ("Webhooks (GitHub, GitLab, etc.)", "WEBHOOK_ENABLED", _setup_webhooks),
 ]
 
@@ -2217,6 +2290,7 @@ def setup_gateway(config: dict):
         or get_env_value("WEIXIN_ACCOUNT_ID")
         or get_env_value("BLUEBUBBLES_SERVER_URL")
         or get_env_value("QQ_APP_ID")
+        or get_env_value("NAPCAT_TOKEN")
         or get_env_value("WEBHOOK_ENABLED")
     )
     if any_messaging:
@@ -2240,6 +2314,8 @@ def setup_gateway(config: dict):
             missing_home.append("BlueBubbles")
         if get_env_value("QQ_APP_ID") and not get_env_value("QQ_HOME_CHANNEL"):
             missing_home.append("QQBot")
+        if get_env_value("NAPCAT_TOKEN") and not get_env_value("NAPCAT_HOME_CHANNEL"):
+            missing_home.append("NapCat")
 
         if missing_home:
             print()

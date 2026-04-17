@@ -107,6 +107,7 @@ Platform toolsets define the complete tool configuration for a deployment target
 | `hermes-weixin` | Same as `hermes-cli`. |
 | `hermes-bluebubbles` | Same as `hermes-cli`. |
 | `hermes-qqbot` | Same as `hermes-cli`. |
+| `hermes-napcat` | Same as `hermes-cli`. NapCat (QQ via OneBot 11 reverse WebSocket). |
 | `hermes-homeassistant` | Same as `hermes-cli`. |
 | `hermes-webhook` | Same as `hermes-cli`. |
 | `hermes-gateway` | Union of all messaging platform toolsets. Used internally when the gateway needs the broadest possible tool set. |
