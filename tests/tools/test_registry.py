@@ -301,6 +301,7 @@ class TestBuiltinDiscovery:
             "tools.image_generation_tool",
             "tools.memory_tool",
             "tools.mixture_of_agents_tool",
+            "tools.napcat_tool",
             "tools.process_registry",
             "tools.rl_training_tool",
             "tools.send_message_tool",

@@ -33,7 +33,10 @@
 | 引用即 @                    | ✅ 回复机器人之前发的消息也算被 @ |
 | 多段长消息                 | ✅ 超长回复会被切片发送 |
 | 出站 echo 关联             | ✅ 使用 `echo` 做请求/响应匹配 |
-| 语音 / 图片 / 文件         | 🛈 入站暂时只解析文字；富媒体转发后续再补 |
+| 出站图片 / 语音 / 视频     | ✅ 在回复里写 `MEDIA:<path>`，gateway 自动调 `send_image_file` / `send_voice` / `send_video`（也可以用 `napcat_call` 自己拼 `image` / `record` / `video` 段）|
+| 出站文件                   | ✅ 通过 `napcat_call("upload_group_file" / "upload_private_file", {...})` |
+| 入站富媒体                 | ✅ 图片 / 语音 / 视频 / 文件 / 表情 / @ 都会被打成 `[图片:<file_id>]` / `[语音:<file_id>]` / `[文件:<name>:<file_id>]` / `@<qq>` 这类内联标记，agent 看到后可用 `napcat_call("get_image" / "get_record" / "get_file", {...})` 取真实资源 |
+| 任意 OneBot 11 动作        | ✅ `napcat_call(action, params)` 工具直通 OneBot — 群历史、撤回、修改资料、踢人、禁言、表情回复等都能调 |
 
 ## 先决条件
 
@@ -209,6 +212,36 @@ websocketClients: [
   }
 ]
 ```
+
+## Skill：`messaging/napcat`
+
+Hermes 自带一份 `napcat` skill（`skills/messaging/napcat/SKILL.md`），里面包含：
+
+- **输出规范**：QQ 不渲染 Markdown，所以 skill 强制要求 agent 输出纯文本、不要 `**` `#` `-` 反引号 / 围栏 / 表格 / `[](url)`，并保持简短。
+- **OneBot 11 动作目录**：消息 / 群管理 / 好友 / 文件 / 资料 / 系统等域内常用动作的参数说明与示例。
+- **入站富媒体标记** 与 `napcat_call("get_image" / "get_record" / "get_file", …)` 拉取流程。
+- **`MEDIA:` 标签** 出站图片 / 语音 / 视频的最佳实践。
+
+加载方式：
+
+- 启动时预加载：`hermes -s messaging/napcat`，或者
+- 在会话里：`/skill messaging/napcat`，或者
+- 让 agent 在 `skills_list` 里看到描述自行加载（推荐，最自然）。
+
+如果你只用网关、没有用 CLI，把这条 skill 在 `hermes skills config` 里**默认开启**即可，agent 收到 NapCat 消息时会自动看到它。
+
+## `napcat_call` 工具
+
+进入 `hermes-napcat` toolset 的会话会自动获得一个 `napcat_call(action, params)` 工具，直通 OneBot 11 动作。例如：
+
+```text
+napcat_call("get_group_msg_history", {"group_id": 12345678, "count": 30})
+napcat_call("set_qq_profile",        {"nickname": "新昵称"})
+napcat_call("delete_msg",            {"message_id": "abcdef"})
+napcat_call("upload_group_file",     {"group_id": 12345678, "file": "/var/log/app.log", "name": "app.log"})
+```
+
+工具只在 gateway 运行 + NapCat 已连接时可用 —— 没连上就直接返回明确错误，不会让 agent 无脑重试。
 
 ## 使用小贴士
 

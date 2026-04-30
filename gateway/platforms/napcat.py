@@ -413,7 +413,45 @@ class NapCatAdapter(BasePlatformAdapter):
         return []
 
     @staticmethod
-    def _extract_reply_and_text(segments: List[Dict[str, Any]]):
+    def _segment_marker(seg_type: str, data: Dict[str, Any]) -> Optional[str]:
+        """Render a non-text segment as a compact text marker for the agent.
+
+        Returned markers stay parseable by an LLM and round-trip into
+        ``napcat_call`` parameters: e.g. an inbound ``image`` segment becomes
+        ``[图片:<file_id>]`` so the agent can fetch it via
+        ``napcat_call("get_image", {"file": "<file_id>"})``.
+        """
+        if seg_type == "image":
+            fid = data.get("file") or data.get("file_id") or data.get("url") or ""
+            fid = str(fid).strip()
+            return f"[图片:{fid}]" if fid else "[图片]"
+        if seg_type == "record":
+            fid = data.get("file") or data.get("file_id") or data.get("url") or ""
+            fid = str(fid).strip()
+            return f"[语音:{fid}]" if fid else "[语音]"
+        if seg_type == "video":
+            fid = data.get("file") or data.get("file_id") or data.get("url") or ""
+            fid = str(fid).strip()
+            return f"[视频:{fid}]" if fid else "[视频]"
+        if seg_type == "file":
+            name = str(data.get("name") or data.get("file_name") or "").strip()
+            fid = str(
+                data.get("file_id") or data.get("id") or data.get("file") or ""
+            ).strip()
+            if name and fid:
+                return f"[文件:{name}:{fid}]"
+            if fid:
+                return f"[文件:{fid}]"
+            if name:
+                return f"[文件:{name}]"
+            return "[文件]"
+        if seg_type == "face":
+            fid = str(data.get("id") or "").strip()
+            return f"[表情:{fid}]" if fid else "[表情]"
+        return None
+
+    @classmethod
+    def _extract_reply_and_text(cls, segments: List[Dict[str, Any]]):
         reply_to: Optional[str] = None
         text_parts: List[str] = []
         for seg in segments:
@@ -423,10 +461,20 @@ class NapCatAdapter(BasePlatformAdapter):
                 value = data.get("id")
                 if value is not None and reply_to is None:
                     reply_to = str(value)
-            elif seg_type == "text":
+                continue
+            if seg_type == "text":
                 value = data.get("text")
                 if isinstance(value, str):
                     text_parts.append(value)
+                continue
+            if seg_type == "at":
+                qq = str(data.get("qq") or "").strip()
+                if qq:
+                    text_parts.append(f"@{qq}")
+                continue
+            marker = cls._segment_marker(seg_type, data)
+            if marker:
+                text_parts.append(marker)
         return reply_to, " ".join(part.strip() for part in text_parts if part.strip()).strip()
 
     def _strip_self_mention(self, segments: List[Dict[str, Any]]):
@@ -436,6 +484,9 @@ class NapCatAdapter(BasePlatformAdapter):
         an ``at`` segment for the replied author when the client uses the
         native "reply" feature, so replying to a bot message still triggers
         the bot while replying to someone else's message does not.
+
+        Non-text segments are surfaced as compact markers (see
+        :meth:`_segment_marker`) so the agent can recognize attachments.
         """
         if not self._self_id:
             return False, ""
@@ -448,6 +499,9 @@ class NapCatAdapter(BasePlatformAdapter):
                 qq = str(data.get("qq") or "").strip()
                 if qq == self._self_id:
                     mentioned = True
+                    continue
+                if qq:
+                    text_parts.append(f"@{qq}")
                 continue
             if seg_type == "reply":
                 continue
@@ -455,6 +509,10 @@ class NapCatAdapter(BasePlatformAdapter):
                 value = data.get("text")
                 if isinstance(value, str):
                     text_parts.append(value)
+                continue
+            marker = self._segment_marker(seg_type, data)
+            if marker:
+                text_parts.append(marker)
         cleaned = " ".join(part.strip() for part in text_parts if part.strip()).strip()
         return mentioned, cleaned
 
@@ -499,43 +557,43 @@ class NapCatAdapter(BasePlatformAdapter):
                 return last_result
         return last_result
 
-    async def _send_chunk(
-        self,
-        chat_id: str,
-        content: str,
-        reply_to: Optional[str],
-    ) -> SendResult:
+    def _resolve_chat_target(self, chat_id: str) -> tuple[str, str]:
+        """Return ``(chat_type, normalized_id)`` for a Hermes ``chat_id``.
+
+        Cached chat types win; otherwise ``group:`` / ``private:`` prefixes are
+        peeled, and a bare numeric id falls back to private (QQ user number).
+        """
         chat_type = self._chat_type_map.get(chat_id)
         normalized_id = chat_id
-        if not chat_type:
-            if chat_id.startswith("group:"):
-                chat_type = "group"
-                normalized_id = chat_id.split(":", 1)[1]
-            elif chat_id.startswith("private:"):
-                chat_type = "private"
-                normalized_id = chat_id.split(":", 1)[1]
-            else:
-                # Heuristic: a plain numeric ID is assumed to be a private chat
-                # (QQ numbers).  Group IDs are cached when the adapter receives
-                # their first inbound message.
-                chat_type = "private"
+        if chat_type:
+            return chat_type, normalized_id
+        if chat_id.startswith("group:"):
+            return "group", chat_id.split(":", 1)[1]
+        if chat_id.startswith("private:"):
+            return "private", chat_id.split(":", 1)[1]
+        # Heuristic: a plain numeric ID is assumed to be a private chat (QQ
+        # numbers). Group IDs get cached when the adapter receives their first
+        # inbound message.
+        return "private", chat_id
 
-        message_segments: List[Dict[str, Any]] = []
-        if reply_to:
-            message_segments.append({"type": "reply", "data": {"id": str(reply_to)}})
-        message_segments.append({"type": "text", "data": {"text": content}})
-
+    async def _dispatch_message_segments(
+        self,
+        chat_type: str,
+        normalized_id: str,
+        segments: List[Dict[str, Any]],
+    ) -> SendResult:
+        """Send a pre-built OneBot message segment array to a chat target."""
         if chat_type == "group":
             action = "send_group_msg"
             params: Dict[str, Any] = {
                 "group_id": self._coerce_int(normalized_id),
-                "message": message_segments,
+                "message": segments,
             }
         else:
             action = "send_private_msg"
             params = {
                 "user_id": self._coerce_int(normalized_id),
-                "message": message_segments,
+                "message": segments,
             }
 
         try:
@@ -568,13 +626,241 @@ class NapCatAdapter(BasePlatformAdapter):
             raw_response=response,
         )
 
-    async def _call_action(
+    async def _send_chunk(
+        self,
+        chat_id: str,
+        content: str,
+        reply_to: Optional[str],
+    ) -> SendResult:
+        chat_type, normalized_id = self._resolve_chat_target(chat_id)
+        message_segments: List[Dict[str, Any]] = []
+        if reply_to:
+            message_segments.append({"type": "reply", "data": {"id": str(reply_to)}})
+        message_segments.append({"type": "text", "data": {"text": content}})
+        return await self._dispatch_message_segments(chat_type, normalized_id, message_segments)
+
+    # ------------------------------------------------------------------
+    # Native rich-media output (OneBot 11 segments + NapCat extensions)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _media_file_uri(path_or_url: str) -> str:
+        """Translate a local path / URL into an OneBot-compatible ``file`` value.
+
+        OneBot 11 accepts ``http://``, ``https://``, ``file://``, ``base64://``,
+        and absolute filesystem paths. We turn local paths into ``file://``
+        URIs (the most portable form across NapCat builds) and pass URLs
+        through untouched.
+        """
+        if not path_or_url:
+            return ""
+        text = str(path_or_url).strip()
+        lowered = text.lower()
+        if lowered.startswith(("http://", "https://", "file://", "base64://", "data:")):
+            return text
+        # Treat everything else as a local filesystem path.
+        try:
+            abs_path = os.path.abspath(os.path.expanduser(text))
+        except Exception:
+            abs_path = text
+        # OneBot 11 ``file://`` URIs use forward slashes regardless of platform.
+        normalized = abs_path.replace("\\", "/")
+        if not normalized.startswith("/"):
+            # Windows drive-letter path (e.g. ``C:/foo``) — tack on the third
+            # slash so the resulting URI remains valid: ``file:///C:/foo``.
+            normalized = "/" + normalized
+        return f"file://{normalized}"
+
+    async def _send_media_message(
+        self,
+        chat_id: str,
+        seg_type: str,
+        media_path: str,
+        caption: Optional[str],
+        reply_to: Optional[str],
+        extra_data: Optional[Dict[str, Any]] = None,
+    ) -> SendResult:
+        """Send an image / voice / video segment together with optional caption."""
+        if self._ws is None or getattr(self._ws, "closed", True):
+            return SendResult(success=False, error="NapCat is not connected", retryable=True)
+
+        chat_type, normalized_id = self._resolve_chat_target(chat_id)
+        segments: List[Dict[str, Any]] = []
+        if reply_to:
+            segments.append({"type": "reply", "data": {"id": str(reply_to)}})
+
+        media_data: Dict[str, Any] = {"file": self._media_file_uri(media_path)}
+        if extra_data:
+            media_data.update(extra_data)
+        segments.append({"type": seg_type, "data": media_data})
+
+        if caption and caption.strip():
+            segments.append({"type": "text", "data": {"text": caption.strip()}})
+
+        return await self._dispatch_message_segments(chat_type, normalized_id, segments)
+
+    async def send_image_file(
+        self,
+        chat_id: str,
+        image_path: str,
+        caption: Optional[str] = None,
+        reply_to: Optional[str] = None,
+        **kwargs,
+    ) -> SendResult:
+        """Send a local image (or URL) as an OneBot ``image`` segment."""
+        del kwargs
+        result = await self._send_media_message(
+            chat_id, "image", image_path, caption, reply_to,
+        )
+        if result.success:
+            return result
+        # Fall back to text so the user at least sees something.
+        logger.warning(
+            "[%s] send_image_file failed (%s); falling back to text.",
+            self.name, result.error,
+        )
+        fallback = caption.strip() if caption and caption.strip() else "[图片发送失败]"
+        return await self.send(chat_id=chat_id, content=fallback, reply_to=reply_to)
+
+    async def send_voice(
+        self,
+        chat_id: str,
+        audio_path: str,
+        caption: Optional[str] = None,
+        reply_to: Optional[str] = None,
+        **kwargs,
+    ) -> SendResult:
+        """Send a voice message as an OneBot ``record`` segment."""
+        del kwargs
+        result = await self._send_media_message(
+            chat_id, "record", audio_path, caption, reply_to,
+        )
+        if result.success:
+            return result
+        logger.warning(
+            "[%s] send_voice failed (%s); falling back to text.",
+            self.name, result.error,
+        )
+        fallback = caption.strip() if caption and caption.strip() else "[语音发送失败]"
+        return await self.send(chat_id=chat_id, content=fallback, reply_to=reply_to)
+
+    async def send_video(
+        self,
+        chat_id: str,
+        video_path: str,
+        caption: Optional[str] = None,
+        reply_to: Optional[str] = None,
+        **kwargs,
+    ) -> SendResult:
+        """Send a video as an OneBot ``video`` segment."""
+        del kwargs
+        result = await self._send_media_message(
+            chat_id, "video", video_path, caption, reply_to,
+        )
+        if result.success:
+            return result
+        logger.warning(
+            "[%s] send_video failed (%s); falling back to text.",
+            self.name, result.error,
+        )
+        fallback = caption.strip() if caption and caption.strip() else "[视频发送失败]"
+        return await self.send(chat_id=chat_id, content=fallback, reply_to=reply_to)
+
+    async def send_document(
+        self,
+        chat_id: str,
+        file_path: str,
+        caption: Optional[str] = None,
+        file_name: Optional[str] = None,
+        reply_to: Optional[str] = None,
+        **kwargs,
+    ) -> SendResult:
+        """Send a file via the NapCat ``upload_*_file`` extension actions."""
+        del kwargs
+        if self._ws is None or getattr(self._ws, "closed", True):
+            return SendResult(success=False, error="NapCat is not connected", retryable=True)
+
+        chat_type, normalized_id = self._resolve_chat_target(chat_id)
+        resolved_path = os.path.abspath(os.path.expanduser(str(file_path)))
+        display_name = (file_name or os.path.basename(resolved_path) or "file").strip()
+
+        if chat_type == "group":
+            action = "upload_group_file"
+            params: Dict[str, Any] = {
+                "group_id": self._coerce_int(normalized_id),
+                "file": resolved_path,
+                "name": display_name,
+            }
+        else:
+            action = "upload_private_file"
+            params = {
+                "user_id": self._coerce_int(normalized_id),
+                "file": resolved_path,
+                "name": display_name,
+            }
+
+        try:
+            response = await self._call_action(action, params)
+        except asyncio.TimeoutError:
+            response = None
+            error = "NapCat upload timed out"
+        except RuntimeError as exc:
+            response = None
+            error = str(exc)
+        else:
+            error = None
+
+        if response is not None and response.get("status") == "ok" and response.get("retcode", 0) == 0:
+            data = response.get("data") if isinstance(response.get("data"), dict) else {}
+            send_result = SendResult(
+                success=True,
+                message_id=str(data.get("message_id") or "") or None,
+                raw_response=response,
+            )
+            # Best-effort caption follow-up — file uploads don't carry text.
+            if caption and caption.strip():
+                await self.send(chat_id=chat_id, content=caption.strip(), reply_to=reply_to)
+            return send_result
+
+        if response is not None:
+            error = (
+                response.get("message")
+                or response.get("wording")
+                or f"upload_{chat_type}_file failed"
+            )
+
+        logger.warning(
+            "[%s] send_document failed (%s); falling back to text notice.",
+            self.name, error,
+        )
+        notice = (
+            f"{caption.strip()}\n[文件:{display_name}]"
+            if caption and caption.strip()
+            else f"[文件:{display_name}]"
+        )
+        fallback = await self.send(chat_id=chat_id, content=notice, reply_to=reply_to)
+        if not fallback.success:
+            return SendResult(
+                success=False,
+                error=error or fallback.error,
+                raw_response=response,
+            )
+        return fallback
+
+    async def call_action(
         self,
         action: str,
         params: Dict[str, Any],
         *,
         timeout: float = DEFAULT_SEND_TIMEOUT,
     ) -> Dict[str, Any]:
+        """Public OneBot 11 action dispatcher.
+
+        Send ``action`` with ``params`` over the live WebSocket and await
+        the matching ``echo`` response. Tools and external code should call
+        this method; internal code may still use the private alias
+        ``_call_action`` for backwards compatibility.
+        """
         if self._ws is None or getattr(self._ws, "closed", True):
             raise RuntimeError("NapCat websocket not connected")
         echo = uuid.uuid4().hex
@@ -595,6 +881,10 @@ class NapCatAdapter(BasePlatformAdapter):
         except asyncio.TimeoutError:
             self._pending_responses.pop(echo, None)
             raise
+
+    # Backwards-compatible private alias — historical callers and the
+    # internal ``_send_chunk`` path still use this name.
+    _call_action = call_action
 
     @staticmethod
     def _coerce_int(value: Any) -> Any:

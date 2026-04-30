@@ -366,8 +366,8 @@ TOOLSETS = {
     },
 
     "hermes-napcat": {
-        "description": "NapCat toolset - QQ messaging via NapCat/OneBot 11 reverse WebSocket (full access)",
-        "tools": _HERMES_CORE_TOOLS,
+        "description": "NapCat toolset - QQ messaging via NapCat/OneBot 11 reverse WebSocket (full access). Adds napcat_call for arbitrary OneBot 11 actions (group history, profile edits, file upload, recall, etc.).",
+        "tools": _HERMES_CORE_TOOLS + ["napcat_call"],
         "includes": []
     },
 
